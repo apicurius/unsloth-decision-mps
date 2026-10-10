@@ -1,0 +1,38 @@
+{
+  "test_before (run_q08_e2, untrained)": {
+    "accuracy": 0.356,
+    "ece": 0.030154721334576567,
+    "loss": 1.21001720815897,
+    "record_accuracy": 0.0025
+  },
+  "args": {
+    "model": "unsloth/Qwen3.5-0.8B",
+    "device": "mps",
+    "max_steps": 240,
+    "epochs": 2.0,
+    "lr": 0.0002,
+    "r": 16,
+    "max_seq_length": 2048,
+    "out": "run_q08_e2b",
+    "skip_eval": false,
+    "skip_before": true
+  },
+  "train_s": 6568.570687055588,
+  "calib": {
+    "accuracy": 0.8,
+    "ece": 0.05248763941228388,
+    "loss": 1.1563947742449818,
+    "record_accuracy": 0.4125,
+    "fitted_types": [
+      0,
+      1,
+      2
+    ]
+  },
+  "test_after": {
+    "accuracy": 0.784,
+    "ece": 0.034417751163244234,
+    "loss": 1.2073350523502522,
+    "record_accuracy": 0.3525
+  }
+}
