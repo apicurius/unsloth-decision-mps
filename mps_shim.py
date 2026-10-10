@@ -1,19 +1,58 @@
+"""Import Unsloth's PyTorch decision-model code on Apple Silicon.
 
-"""Load Unsloth's pure-PyTorch decision-model code without unsloth/__init__.py (which refuses Apple Silicon)."""
-import sys, types, importlib.util, pathlib, torch
-SP = pathlib.Path(importlib.util.find_spec("unsloth").origin).parent
-def _pkg(name, path):
-    m = types.ModuleType(name); m.__path__ = [str(path)]; sys.modules[name] = m; return m
-_pkg("unsloth", SP); _pkg("unsloth.models", SP / "models"); _pkg("unsloth._vendor", SP / "_vendor")
-u = types.ModuleType("unsloth.models._utils")
-u._mark_full_finetuning = lambda model, full_finetuning=False: (setattr(model, "_unsloth_full_finetuning", bool(full_finetuning)), model)[1]
-u.apply_unsloth_gradient_checkpointing = lambda mode, *a, **k: True if mode else False
-u.is_bfloat16_supported = lambda: False
-u.patch_gradient_accumulation_fix = lambda *a, **k: None   # only needed for transformers 5.0-5.5
-sys.modules[u.__name__] = u
-lu = types.ModuleType("unsloth.models.loader_utils")
-lu.is_distributed = lambda: False
-lu.prepare_device_map = lambda *a, **k: (None, None)
-sys.modules[lu.__name__] = lu
-import unsloth.models.decision as decision
-from unsloth.models.decision import FastDecisionModel, DecisionTrainer
+unsloth/__init__.py routes Macs to its MLX backend, where FastDecisionModel is not
+supported, and its GPU path only accepts NVIDIA, AMD and Intel GPUs. This module
+skips that file: it registers bare `unsloth` packages that point at the installed
+sources, stubs the few GPU-only helpers decision.py imports, and then imports
+FastDecisionModel and DecisionTrainer directly.
+"""
+
+import importlib.util
+import pathlib
+import sys
+import types
+
+UNSLOTH_DIR = pathlib.Path(importlib.util.find_spec("unsloth").origin).parent
+
+
+def _register_package(name, path):
+    module = types.ModuleType(name)
+    module.__path__ = [str(path)]
+    sys.modules[name] = module
+    return module
+
+
+def _register_module(name, **attributes):
+    module = types.ModuleType(name)
+    module.__dict__.update(attributes)
+    sys.modules[name] = module
+    return module
+
+
+def _mark_full_finetuning(model, full_finetuning=False):
+    # Must honour the flag: get_peft_model skips LoRA when it is True.
+    model._unsloth_full_finetuning = bool(full_finetuning)
+    return model
+
+
+_register_package("unsloth", UNSLOTH_DIR)
+_register_package("unsloth.models", UNSLOTH_DIR / "models")
+_register_package("unsloth._vendor", UNSLOTH_DIR / "_vendor")
+
+_register_module(
+    "unsloth.models._utils",
+    _mark_full_finetuning=_mark_full_finetuning,
+    apply_unsloth_gradient_checkpointing=lambda mode, *args, **kwargs: bool(mode),
+    is_bfloat16_supported=lambda: False,
+    # Only needed for transformers 5.0 - 5.5.
+    patch_gradient_accumulation_fix=lambda *args, **kwargs: None,
+)
+_register_module(
+    "unsloth.models.loader_utils",
+    is_distributed=lambda: False,
+    prepare_device_map=lambda *args, **kwargs: (None, None),
+)
+
+from unsloth.models.decision import DecisionTrainer, FastDecisionModel
+
+__all__ = ["DecisionTrainer", "FastDecisionModel"]
